@@ -220,3 +220,6 @@ target/*
 .gitatributes
 .gitignore
 DnsSearch.iml
+domains.txt
+out.txt
+
