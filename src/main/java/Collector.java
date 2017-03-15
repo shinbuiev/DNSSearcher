@@ -30,7 +30,7 @@ public class Collector implements Runnable {
             System.out.println(e.getMessage());
         }
 
-        ExecutorService executor = Executors.newFixedThreadPool(100);Executors.
+        ExecutorService executor = Executors.newFixedThreadPool(100);
 
         for (int i = 0; i < 100; i++){
             Runnable collector = new Collector();
