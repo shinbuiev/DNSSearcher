@@ -1,10 +1,7 @@
 import org.xbill.DNS.*;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,7 +44,7 @@ public class Collector implements Runnable {
         else
             aaaa = Boolean.parseBoolean(System.getProperty("aaaa"));
 
-        int nThreads = 500;
+        int nThreads = 200;
         if(System.getProperty("thread") != null)
             try {
                 nThreads = Integer.parseInt(System.getProperty("thread"));
@@ -56,9 +53,28 @@ public class Collector implements Runnable {
                 System.out.println(e.getMessage());
             }
 
+        String prefixSetup = "domain";
+
+        if(mx) prefixSetup = prefixSetup + ";MX";
+        if(ns) prefixSetup = prefixSetup + ";NS";
+        if(a) prefixSetup = prefixSetup + ";A";
+        if(aaaa) prefixSetup = prefixSetup + ";AAAA";
+
+        synchronizedList.add("sep=;");
+        synchronizedList.add(prefixSetup);
+
+
+        String fileName = "domains.txt";
+
+        try {
+            fileName = args[0];
+        }
+        catch (Exception e){
+            System.out.println("no such file");
+        }
 
         String line;
-        try (BufferedReader br = new BufferedReader(new FileReader(args[0]))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             while ((line = br.readLine()) != null) {
                 domains.add(line);
             }
@@ -77,7 +93,7 @@ public class Collector implements Runnable {
         while (!executor.isTerminated()) {}
 
         try {
-            PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("out.txt", true)));
+            PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("out.csv", true)));
             for(String s : synchronizedList) {
                 out.println(s);
             }
@@ -92,9 +108,9 @@ public class Collector implements Runnable {
 
     public void run() {
         while (domains.size() != 0){
-            String domain = domains.remove(0);
+            String domain = getDomain(domains);
             count.getAndIncrement();
-            StringBuilder result = new StringBuilder(domain + ", ");
+            StringBuilder result = new StringBuilder(domain + ";");
             if(mx){
                 result.append(getMx(domain));
             }
@@ -118,6 +134,12 @@ public class Collector implements Runnable {
         System.out.println("Thread " + Thread.currentThread().getName() + " done and made " + count.get() + " domains!");
     }
 
+    public static synchronized String  getDomain(ArrayList<String> domains){
+        if(domains.size() > 0)
+            return domains.remove(0);
+        return "";
+    }
+
     public String getMx(String domain) {
 
         StringBuilder builder = new StringBuilder();
@@ -129,13 +151,15 @@ public class Collector implements Runnable {
 
                 for (int i = 0; i < mxRecords.length; i++) {
                     MXRecord mx = (MXRecord) mxRecords[i];
-                    builder.append("MX: ").append(mx.getTarget()).append(" priority: " + mx.getPriority());
-                    if(i < mxRecords.length)
-                        builder.append(", ");
+                    builder.append(mx.getTarget()).append(":" + mx.getPriority());
+                    if(i < mxRecords.length - 1)
+                        builder.append(",");
+                    if(i == mxRecords.length - 1)
+                        builder.append(";");
                 }
             }
             else {
-                builder.append("MX: null, ");
+                builder.append("null;");
             }
         } catch (TextParseException e) {
             System.out.println("Error for " + domain + " : " + e.getMessage());
@@ -154,13 +178,15 @@ public class Collector implements Runnable {
             if (nsRecords != null) {
                 for (int i = 0; i < nsRecords.length; i++) {
                     NSRecord mx = (NSRecord) nsRecords[i];
-                    builder.append("NS: ").append(mx.getTarget());
-                    if(i < nsRecords.length)
-                        builder.append(", ");
+                    builder.append(mx.getTarget());
+                    if(i < nsRecords.length - 1)
+                        builder.append(",");
+                    if(i == nsRecords.length - 1)
+                        builder.append(";");
                 }
             }
             else {
-                builder.append("NS: null, ");
+                builder.append("null;");
             }
         } catch (TextParseException e) {
             System.out.println("Error for " + domain + " : " + e.getMessage());
@@ -179,13 +205,15 @@ public class Collector implements Runnable {
 
                 for (int i = 0; i < records.length; i++) {
                     ARecord aRecord = (ARecord) records[i];
-                    builder.append("A: ").append(aRecord.getAddress());
-                    if(i < records.length)
-                        builder.append(", ");
+                    builder.append(aRecord.getAddress());
+                    if(i < records.length - 1)
+                        builder.append(",");
+                    if(i == records.length - 1)
+                        builder.append(";");
                 }
             }
             else {
-                builder.append("A: null, ");
+                builder.append("null;");
             }
         } catch (TextParseException e) {
             System.out.println("Error for " + domain + " : " + e.getMessage());
@@ -205,13 +233,15 @@ public class Collector implements Runnable {
 
                 for (int i = 0; i < records.length; i++) {
                     AAAARecord aRecord = (AAAARecord) records[i];
-                    builder.append("AAAA: ").append(aRecord.rdataToString());
-                    if(i < records.length)
-                        builder.append(", ");
+                    builder.append(aRecord.rdataToString());
+                    if(i < records.length - 1)
+                        builder.append(",");
+                    if(i == records.length - 1)
+                        builder.append(";");
                 }
             }
             else {
-                builder.append("AAAA: null");
+                builder.append("null");
             }
         } catch (TextParseException e) {
             System.out.println("Error for " + domain + " : " + e.getMessage());
