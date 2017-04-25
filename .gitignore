@@ -215,11 +215,6 @@ pip-log.txt
 #Mr Developer
 .mr.developer.cfg
 
-.idea/*
-target/*
-.gitatributes
-.gitignore
-DnsSearch.iml
 domains.txt
-out.txt
-
+.idea
+target

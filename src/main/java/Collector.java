@@ -1,6 +1,8 @@
 import org.xbill.DNS.*;
 
 import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -13,7 +15,7 @@ public class Collector implements Runnable {
     private static ArrayList<String> results = new ArrayList<>();
     private static List<String> synchronizedList =  Collections.synchronizedList(results);
 
-    public static boolean  mx;
+    public static boolean mx;
     public static boolean ns;
     public static boolean a;
     public static boolean aaaa;
@@ -55,26 +57,25 @@ public class Collector implements Runnable {
 
         String prefixSetup = "domain";
 
-        if(mx) prefixSetup = prefixSetup + ";MX";
+        if(mx) prefixSetup = prefixSetup + ";MX|MX ptr";
         if(ns) prefixSetup = prefixSetup + ";NS";
-        if(a) prefixSetup = prefixSetup + ";A";
+        if(a) prefixSetup = prefixSetup + ";A|A ptr";
         if(aaaa) prefixSetup = prefixSetup + ";AAAA";
 
         synchronizedList.add("sep=;");
         synchronizedList.add(prefixSetup);
 
-
-        String fileName = "domains.txt";
+        String inputFileName = "domains.txt";
 
         try {
-            fileName = args[0];
+            inputFileName = args[0];
         }
         catch (Exception e){
             System.out.println("no such file");
         }
 
         String line;
-        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(inputFileName))) {
             while ((line = br.readLine()) != null) {
                 domains.add(line);
             }
@@ -92,8 +93,22 @@ public class Collector implements Runnable {
 
         while (!executor.isTerminated()) {}
 
+        String outputFileName = "";
+        if(System.getProperty("out") == null){
+            outputFileName = "out.csv";
+        }else {
+            outputFileName = System.getProperty("out");
+        }
+
         try {
-            PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("out.csv", true)));
+            outputFileName = args[1];
+        }
+        catch (Exception e){
+            System.out.println("Output fileName missed");
+        }
+
+        try {
+            PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(outputFileName, false)));
             for(String s : synchronizedList) {
                 out.println(s);
             }
@@ -151,7 +166,7 @@ public class Collector implements Runnable {
 
                 for (int i = 0; i < mxRecords.length; i++) {
                     MXRecord mx = (MXRecord) mxRecords[i];
-                    builder.append(mx.getTarget()).append(":" + mx.getPriority());
+                    builder.append(mx.getTarget()).append(":" + mx.getPriority()).append("|").append(getMxPtr(mx.getTarget().toString()));
                     if(i < mxRecords.length - 1)
                         builder.append(",");
                     if(i == mxRecords.length - 1)
@@ -194,6 +209,29 @@ public class Collector implements Runnable {
         return builder.toString();
     }
 
+    public String getMxPtr(String domain){
+        StringBuilder builder = new StringBuilder();
+
+        try {
+            Record[] records = new Lookup(domain, Type.A).run();
+
+            if (records != null) {
+
+                for (int i = 0; i < records.length; i++) {
+                    ARecord aRecord = (ARecord) records[i];
+                    builder.append(aRecord.getAddress().getCanonicalHostName());
+                }
+            }
+            else {
+                builder.append("null");
+            }
+        } catch (TextParseException e) {
+            System.out.println("Error for " + domain + " : " + e.getMessage());
+        }
+
+        return builder.toString();
+    }
+
     public String getA(String domain) {
 
         StringBuilder builder = new StringBuilder();
@@ -205,7 +243,8 @@ public class Collector implements Runnable {
 
                 for (int i = 0; i < records.length; i++) {
                     ARecord aRecord = (ARecord) records[i];
-                    builder.append(aRecord.getAddress());
+                    builder.append(aRecord.getAddress().getHostAddress()).append("|").append(aRecord.getAddress().getCanonicalHostName());
+
                     if(i < records.length - 1)
                         builder.append(",");
                     if(i == records.length - 1)
